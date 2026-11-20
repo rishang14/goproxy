@@ -15,9 +15,11 @@ func (e *Error) Error() string {
 }
 
 var (
-	ErrUnsupportedMethod  = &Error{Status: 405, Reason: "Method Not Allowed"}
-	ErrUnsupportedVersion = &Error{Status: 505, Reason: "HTTP Version Not Supported"}
-	ErrMalformedRequest   = &Error{Status: 400, Reason: "Bad Request"}
+	ErrUnsupportedMethod   = &Error{Status: 405, Reason: "Method Not Allowed"}
+	ErrUnsupportedVersion  = &Error{Status: 505, Reason: "HTTP Version Not Supported"}
+	ErrMalformedRequest    = &Error{Status: 400, Reason: "Bad Request"}
+	ErrHeaderLimitExceeded = &Error{Status: 431, Reason: "Header Fields Too Large"}
+	ErrContentTooLarge     = &Error{Status: 413, Reason: "Check Content Length"}
 )
 
 // this function basically parse the request line and tell it is valid or not
@@ -25,17 +27,17 @@ func ParseRequest(val string) (string, string, string, error) {
 	method, parts, found := strings.Cut(val, " ")
 
 	if !found {
-		return " ", " ", " ", ErrMalformedRequest
+		return "", "", "", ErrMalformedRequest
 	}
 
 	if !checkMethod(method) {
-		return " ", " ", " ", ErrUnsupportedMethod
+		return "", "", "", ErrUnsupportedMethod
 	}
 
 	target, version, found := strings.Cut(parts, " ")
 
 	if !found {
-		return " ", " ", " ", ErrMalformedRequest
+		return "", "", "", ErrMalformedRequest
 	}
 
 	version = strings.TrimSpace(version)

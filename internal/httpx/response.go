@@ -28,3 +28,17 @@ func WriteErrorFor(w io.Writer, err error) error {
 	}
 	return WriteError(w, 400, "Bad Request")
 }
+
+// WriteResponse write to a client
+func WriteResponse(w io.Writer, status int, reason string, body []byte) error {
+	resp := fmt.Sprintf(
+		"HTTP/1.1 %d %s\r\n"+
+			"Content-Length: %d\r\n"+
+			"Connection: keep-alive\r\n"+
+			"\r\n",
+		status, reason, len(body),
+	)
+	w.Write([]byte(resp))   // headers
+	_, err := w.Write(body) //body
+	return err
+}

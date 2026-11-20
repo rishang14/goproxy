@@ -13,6 +13,6 @@ test:
 	go test ./...
 
 build:
-	go build -o bin/web-server .
+	go build -o bin/web-server ./cmd/server
 
 check: fmt vet test

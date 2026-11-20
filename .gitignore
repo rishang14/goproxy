@@ -1,0 +1,48 @@
+# Markdown files
+*.md
+
+# Compiled binaries
+/bin/
+/out/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build/test artifacts
+*.test
+*.out
+cover.out
+coverage.html
+
+# Go workspace
+go.work
+go.work.sum
+
+# Vendor (if not committed)
+# vendor/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# OS generated
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Notes directory
+notes/
+
+# Temp / logs
+*.log
+tmp/
+*.tmp
