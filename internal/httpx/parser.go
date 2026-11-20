@@ -19,7 +19,7 @@ var (
 	ErrUnsupportedVersion  = &Error{Status: 505, Reason: "HTTP Version Not Supported"}
 	ErrMalformedRequest    = &Error{Status: 400, Reason: "Bad Request"}
 	ErrHeaderLimitExceeded = &Error{Status: 431, Reason: "Header Fields Too Large"}
-	ErrContentTooLarge     = &Error{Status: 413, Reason: "Check Content Length"}
+	ErrContentTooLarge     = &Error{Status: 413, Reason: "Content Too Large"}
 )
 
 // this function basically parse the request line and tell it is valid or not

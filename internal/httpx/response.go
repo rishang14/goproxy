@@ -30,15 +30,22 @@ func WriteErrorFor(w io.Writer, err error) error {
 }
 
 // WriteResponse write to a client
-func WriteResponse(w io.Writer, status int, reason string, body []byte) error {
+func WriteResponse(w io.Writer, status int, reason string, body []byte, connection bool) error {
+	val := ""
+
+	if connection {
+		val = "keep-alive"
+	} else {
+		val = "close"
+	}
 	resp := fmt.Sprintf(
 		"HTTP/1.1 %d %s\r\n"+
 			"Content-Length: %d\r\n"+
-			"Connection: keep-alive\r\n"+
+			"Connection: %s\r\n"+
 			"\r\n",
-		status, reason, len(body),
+		status, reason, len(body), val,
 	)
-	w.Write([]byte(resp))   // headers
-	_, err := w.Write(body) //body
+	out := append([]byte(resp), body...)
+	_, err := w.Write(out)
 	return err
 }

@@ -115,13 +115,20 @@ func handleConnection(conn net.Conn) {
 		var body []byte
 
 		if ck, ok := headers["Content-Length"]; ok {
+			if len(ck) > 1 {
+				httpx.WriteErrorFor(conn, httpx.ErrMalformedRequest)
+				return
+			}
 			n, err := strconv.Atoi(ck[0])
 			if err != nil {
 				httpx.WriteErrorFor(conn, httpx.ErrMalformedRequest)
 				return
 			}
-			if n < 0 || n > maxBodyBytes {
-				log.Println("Content-length is greater than maxbodybytes")
+			if n < 0 {
+				httpx.WriteErrorFor(conn, httpx.ErrMalformedRequest)
+				return
+			}
+			if n > maxBodyBytes {
 				httpx.WriteErrorFor(conn, httpx.ErrContentTooLarge)
 				return
 			}
@@ -133,8 +140,11 @@ func handleConnection(conn net.Conn) {
 				return
 			}
 		}
-
-		httpx.WriteResponse(conn, 200, "OK", body)
+		keepAlive := shouldKeepAlive(version, headers)
+		httpx.WriteResponse(conn, 200, "OK", body, keepAlive)
+		if !keepAlive {
+			return
+		}
 	}
 
 }
@@ -142,4 +152,20 @@ func handleConnection(conn net.Conn) {
 func canonicalKey(key string) string {
 	value := textproto.CanonicalMIMEHeaderKey(key)
 	return value
+}
+
+// checks request HTTP/1.1 defaults to keeping it open; HTTP/1.0 defaults
+func shouldKeepAlive(version string, headers map[string][]string) bool {
+
+	val := headers["Connection"]
+
+	if len(val) == 0 {
+		return version == "HTTP/1.1"
+	}
+
+	if version == "HTTP/1.0" {
+		return strings.EqualFold(val[0], "keep-alive")
+	}
+
+	return !strings.EqualFold(val[0], "close")
 }
