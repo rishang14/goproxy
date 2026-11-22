@@ -2,24 +2,21 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
-	"net/textproto"
+	"os"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/rishang14/goproxy/internal/httpx"
 )
 
-const (
-	maxBodyBytes   = 1 << 20 // 1 MiB — matches nginx's default
-	maxHeaderBytes = 1 << 16 // 64 KiB total across all header lines
-	maxHeaderCount = 100     // number of header lines
-)
+type helloHandler struct{}
+type notFoundHandler struct{}
 
 func main() {
 	listener, err := net.Listen("tcp", ":8080")
@@ -43,8 +40,7 @@ func main() {
 	}
 }
 
-// it will accept the input from the incoming request parse it  and set the header and all and  parse it
-// and it will also read the content body and everythig
+// it will accept the incoming connection and send everything to readrequest
 func handleConnection(conn net.Conn) {
 
 	defer conn.Close()
@@ -60,98 +56,29 @@ func handleConnection(conn net.Conn) {
 
 	reader := bufio.NewReader(conn)
 	for {
-		headerCount := 0
-		headerBytes := 0
-		headers := make(map[string][]string)
 		err := conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 		if err != nil {
 			log.Printf("Timeout Error : %s", err)
 			return
 		}
-		requestLine, err := reader.ReadString('\n')
 
+		req, err := httpx.ReadRequest(reader)
 		if err != nil {
-			log.Printf("Reading error %v", err)
-			return
-		}
-
-		method, target, version, err := httpx.ParseRequest(requestLine)
-		if err != nil {
+			// goodbye: client closed, or idle past the deadline
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrDeadlineExceeded) {
+				return
+			}
+			// a real bad request: tell the client why
 			httpx.WriteErrorFor(conn, err)
 			return
 		}
-		fmt.Printf("Method is %s  target is %s  version is %s \n", method, target, version)
-		for {
-			header, err := reader.ReadString('\n')
-			headerCount++
-			headerBytes += len(header)
-
-			if headerCount > maxHeaderCount || headerBytes > maxHeaderBytes {
-				httpx.WriteErrorFor(conn, httpx.ErrHeaderLimitExceeded)
-				return
-			}
-			if err != nil {
-				log.Printf("Reading error %v", err)
-				return
-			}
-			if strings.TrimSpace(header) == "" {
-				break
-			}
-
-			name, value, found := strings.Cut(header, ":")
-
-			if !found {
-				log.Printf("malformed header line: %q", header)
-				httpx.WriteErrorFor(conn, httpx.ErrMalformedRequest)
-				return
-			}
-
-			key := canonicalKey(strings.TrimSpace(name))
-			headers[key] = append(headers[key], strings.TrimSpace(value))
-			fmt.Printf("header key %s  and value is %s  \n", key, headers[key])
-
-		}
-
-		var body []byte
-
-		if ck, ok := headers["Content-Length"]; ok {
-			if len(ck) > 1 {
-				httpx.WriteErrorFor(conn, httpx.ErrMalformedRequest)
-				return
-			}
-			n, err := strconv.Atoi(ck[0])
-			if err != nil {
-				httpx.WriteErrorFor(conn, httpx.ErrMalformedRequest)
-				return
-			}
-			if n < 0 {
-				httpx.WriteErrorFor(conn, httpx.ErrMalformedRequest)
-				return
-			}
-			if n > maxBodyBytes {
-				httpx.WriteErrorFor(conn, httpx.ErrContentTooLarge)
-				return
-			}
-			body = make([]byte, n)
-			got, err := io.ReadFull(reader, body)
-			if err != nil {
-				log.Printf("body need %d got %d bytes err %v", len(body), got, err)
-				httpx.WriteErrorFor(conn, httpx.ErrMalformedRequest)
-				return
-			}
-		}
-		keepAlive := shouldKeepAlive(version, headers)
-		httpx.WriteResponse(conn, 200, "OK", body, keepAlive)
+		keepAlive := shouldKeepAlive(req.Version, req.Headers)
+		httpx.Serve(conn, notFoundHandler{}, req, keepAlive)
 		if !keepAlive {
 			return
 		}
 	}
 
-}
-
-func canonicalKey(key string) string {
-	value := textproto.CanonicalMIMEHeaderKey(key)
-	return value
 }
 
 // checks request HTTP/1.1 defaults to keeping it open; HTTP/1.0 defaults
@@ -168,4 +95,13 @@ func shouldKeepAlive(version string, headers map[string][]string) bool {
 	}
 
 	return !strings.EqualFold(val[0], "close")
+}
+
+func (h helloHandler) ServeHTTP(w httpx.ResponseWriter, r *httpx.Request) {
+	w.WriteBody([]byte("hello from " + r.Target))
+}
+
+func (h notFoundHandler) ServeHTTP(w httpx.ResponseWriter, r *httpx.Request) {
+	w.WriteResponse(404)
+	w.WriteBody([]byte("not found"))
 }

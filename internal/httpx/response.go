@@ -30,7 +30,7 @@ func WriteErrorFor(w io.Writer, err error) error {
 }
 
 // WriteResponse write to a client
-func WriteResponse(w io.Writer, status int, reason string, body []byte, connection bool) error {
+func WriteResponse(w io.Writer, status int, reason string, body []byte, connection bool, version string) error {
 	val := ""
 
 	if connection {
@@ -39,13 +39,29 @@ func WriteResponse(w io.Writer, status int, reason string, body []byte, connecti
 		val = "close"
 	}
 	resp := fmt.Sprintf(
-		"HTTP/1.1 %d %s\r\n"+
+		"%s %d %s\r\n"+
 			"Content-Length: %d\r\n"+
 			"Connection: %s\r\n"+
 			"\r\n",
-		status, reason, len(body), val,
+		version, status, reason, len(body), val,
 	)
 	out := append([]byte(resp), body...)
 	_, err := w.Write(out)
 	return err
+}
+
+func StatusText(status int) string {
+	switch status {
+	case 200:
+		return "OK"
+	case 400:
+		return "Bad Request"
+	case 404:
+		return "Not Found"
+	case 405:
+		return "Method Not Allowed"
+	case 500:
+		return "Internal Server Error"
+	}
+	return ""
 }
