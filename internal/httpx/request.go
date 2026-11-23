@@ -17,7 +17,9 @@ const (
 
 type Request struct {
 	Method  string
-	Target  string
+	Target  string // as sent: "/hello?name=x"
+	Path    string // before '?': "/hello"
+	Query   string // after '?':  "name=x"
 	Version string
 	Headers map[string][]string
 	Body    []byte
@@ -91,7 +93,8 @@ func ReadRequest(r *bufio.Reader) (*Request, error) {
 			return nil, ErrMalformedRequest
 		}
 	}
-	return &Request{Method: method, Target: target, Version: version, Headers: headers, Body: body}, nil
+	path, query, _ := strings.Cut(target, "?")
+	return &Request{Method: method, Target: target, Path: path, Query: query, Version: version, Headers: headers, Body: body}, nil
 }
 
 func canonicalKey(key string) string {

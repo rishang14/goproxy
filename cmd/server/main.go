@@ -16,7 +16,6 @@ import (
 )
 
 type helloHandler struct{}
-type notFoundHandler struct{}
 
 func main() {
 	listener, err := net.Listen("tcp", ":8080")
@@ -24,9 +23,10 @@ func main() {
 		log.Fatal("Error listening", err)
 	}
 	defer listener.Close()
+	router := httpx.NewRouter()
+	router.Handle("GET", "/hello", helloHandler{})
 
 	fmt.Println("TCP Server started at port:8080")
-
 	for {
 		conn, err := listener.Accept()
 
@@ -35,13 +35,13 @@ func main() {
 			continue
 		}
 
-		go handleConnection(conn)
+		go handleConnection(conn, router)
 
 	}
 }
 
 // it will accept the incoming connection and send everything to readrequest
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, router *httpx.Router) {
 
 	defer conn.Close()
 
@@ -73,7 +73,7 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 		keepAlive := shouldKeepAlive(req.Version, req.Headers)
-		httpx.Serve(conn, notFoundHandler{}, req, keepAlive)
+		httpx.Serve(conn, router, req, keepAlive)
 		if !keepAlive {
 			return
 		}
@@ -98,10 +98,5 @@ func shouldKeepAlive(version string, headers map[string][]string) bool {
 }
 
 func (h helloHandler) ServeHTTP(w httpx.ResponseWriter, r *httpx.Request) {
-	w.WriteBody([]byte("hello from " + r.Target))
-}
-
-func (h notFoundHandler) ServeHTTP(w httpx.ResponseWriter, r *httpx.Request) {
-	w.WriteResponse(404)
-	w.WriteBody([]byte("not found"))
+	w.WriteBody([]byte("hello from " + r.Path))
 }
